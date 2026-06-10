@@ -1,0 +1,11 @@
+# Secrets & generated runtime config (created by bootstrap.sh) — never commit
+.env
+.mcp.json
+
+# AffiNE persistent data, if ever placed inside the repo (default lives in ~/.affine)
+data/
+
+# OS / editor noise
+.DS_Store
+*.swp
+*~

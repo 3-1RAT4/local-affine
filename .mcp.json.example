@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "affine": {
+      "type": "http",
+      "url": "http://localhost:__MCP_PORT__/mcp",
+      "headers": {
+        "Authorization": "Bearer __AFFINE_MCP_HTTP_TOKEN__"
+      }
+    }
+  }
+}

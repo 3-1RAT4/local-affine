@@ -1,0 +1,110 @@
+name: affine
+services:
+  affine:
+    # Pinned to the running version (app 0.26.7) by digest for reproducibility.
+    image: ghcr.io/toeverything/affine:0.26.7@sha256:74baac632031260f8c1c8ba34d9734b5addba0b8e72d6d9b9721e39f77738e94
+    container_name: affine_server
+    ports:
+      - '${PORT:-3010}:3010'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      affine_migration:
+        condition: service_completed_successfully
+    volumes:
+      # custom configurations
+      - ${UPLOAD_LOCATION}:/root/.affine/storage
+      - ${CONFIG_LOCATION}:/root/.affine/config
+    env_file:
+      - .env
+    environment:
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
+      - AFFINE_INDEXER_ENABLED=false
+    restart: unless-stopped
+
+  affine_migration:
+    image: ghcr.io/toeverything/affine:0.26.7@sha256:74baac632031260f8c1c8ba34d9734b5addba0b8e72d6d9b9721e39f77738e94
+    container_name: affine_migration_job
+    volumes:
+      # custom configurations
+      - ${UPLOAD_LOCATION}:/root/.affine/storage
+      - ${CONFIG_LOCATION}:/root/.affine/config
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    env_file:
+      - .env
+    environment:
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
+      - AFFINE_INDEXER_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  affine_mcp:
+    build: ./affine-mcp-server
+    container_name: affine_mcp_server
+    depends_on:
+      - affine
+    ports:
+      - '${MCP_PORT:-3011}:3000'
+    environment:
+      # HTTP transport (mostly already defaulted in the image, set explicitly)
+      - MCP_TRANSPORT=http
+      - AFFINE_MCP_HTTP_HOST=0.0.0.0
+      - PORT=3000
+      # Connect to the LOCAL AffiNE over the internal compose network
+      - AFFINE_BASE_URL=http://affine:3010
+      # HTTP-layer auth: clients send "Authorization: Bearer <token>"
+      - AFFINE_MCP_AUTH_MODE=bearer
+      - AFFINE_MCP_HTTP_TOKEN=${AFFINE_MCP_HTTP_TOKEN}
+      # AffiNE auth: set ONE of the two below in .env (token preferred)
+      - AFFINE_API_TOKEN=${AFFINE_API_TOKEN:-}
+      - AFFINE_EMAIL=${AFFINE_EMAIL:-}
+      - AFFINE_PASSWORD=${AFFINE_PASSWORD:-}
+      # Optional: limit the tool surface (full|read_only|core|authoring)
+      - AFFINE_TOOL_PROFILE=${AFFINE_TOOL_PROFILE:-full}
+    # Override the image healthcheck: it uses "localhost", which resolves to IPv6
+    # ::1 inside alpine, but the server only binds IPv4 0.0.0.0 -> use 127.0.0.1.
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.8.0@sha256:aa049e689e141a4358ad1d4562dc49c88a89fbab711fd8fcc33f684c80b26301
+    container_name: affine_redis
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16@sha256:00ba258a66dac104fd5171074a0084462a64a1369d8513f3d0a634e2f24d15bc
+    container_name: affine_postgres
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE:-affine}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      # you better set a password for you database
+      # or you may add 'POSTGRES_HOST_AUTH_METHOD=trust' to ignore postgres security policy
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test:
+        ['CMD', 'pg_isready', '-U', "${DB_USERNAME}", '-d', "${DB_DATABASE:-affine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
