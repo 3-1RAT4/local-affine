@@ -29,11 +29,23 @@ Cloned without submodules? Run `git submodule update --init --recursive` first.
 | ----------- | ----------------------------- | ------------------------- |
 | AffiNE web  | http://localhost:3010         | affine `0.26.7`           |
 | MCP (HTTP)  | http://localhost:3011/mcp     | affine-mcp-server `v2.1.0`|
-| Postgres    | internal (compose network)    | pgvector `pg16`           |
+| Postgres    | internal (named volume `affine_pgdata`) | pgvector `pg16`     |
 | Redis       | internal (compose network)    | redis `8.8.0`             |
 
 All container images are **digest-pinned** in `docker-compose.yml`; the MCP server is built
 from the version-pinned submodule.
+
+## Runtime: Docker or rootless Podman
+
+Works under both `docker compose` and `podman compose`. Postgres uses a **named volume**
+(not a host bind mount) on purpose: Postgres runs as an in-container non-root UID (999), which
+Docker maps to host 999 but rootless Podman maps to a subuid — a shared host bind mount can't
+satisfy both and Podman's entrypoint fails with `chown … Operation not permitted`. The named
+volume is owned correctly by whichever runtime creates it.
+
+Docker and Podman both bind host ports 3010/3011, so **only one runtime can run the stack at a
+time**. To switch, stop the other first (e.g. `docker compose down`, then `podman compose up -d`).
+Each runtime keeps its own independent `affine_pgdata` volume.
 
 ## MCP client config
 

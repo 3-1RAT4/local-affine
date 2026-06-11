@@ -92,7 +92,12 @@ services:
     image: pgvector/pgvector:pg16@sha256:00ba258a66dac104fd5171074a0084462a64a1369d8513f3d0a634e2f24d15bc
     container_name: affine_postgres
     volumes:
-      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+      # Runtime-managed named volume (NOT a host bind mount): Postgres runs as an
+      # in-container non-root UID (999), which Docker maps to host 999 but rootless
+      # Podman maps to a subuid (100998) — a shared host bind mount can't satisfy both
+      # and the entrypoint's chown fails with EPERM under Podman. A named volume is
+      # owned correctly by whichever runtime creates it. Works on Docker + rootless Podman.
+      - affine_pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -108,3 +113,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+volumes:
+  # Postgres data — managed by the container runtime (see postgres.volumes above).
+  affine_pgdata:
