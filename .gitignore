@@ -5,6 +5,10 @@
 # AffiNE persistent data, if ever placed inside the repo (default lives in ~/.affine)
 data/
 
+# Backups, if BACKUP_ROOT is pointed inside the repo (default is ~/.affine/backups,
+# outside the repo). They contain a DB dump and a copy of .env — never commit.
+backups/
+
 # OS / editor noise
 .DS_Store
 *.swp

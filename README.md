@@ -62,6 +62,33 @@ Any HTTP MCP client points at `http://localhost:3011/mcp` with header
   first tool call can briefly return empty before auth settles. For deterministic startup, set
   `AFFINE_API_TOKEN` in `.env` (token auth is not deferred).
 
+## Backup & restore
+
+Per the [official guidance](https://docs.affine.pro/self-host-affine/administer/backup-and-restore),
+a backup is a logical `pg_dump` of Postgres plus the uploads and config. Two on-demand scripts
+(no scheduler) handle this; both auto-detect Docker vs Podman.
+
+```bash
+./backup.sh              # full backup -> ~/.affine/backups/<timestamp>/
+./backup.sh --keep 14    # also prune all but the newest 14 backups
+```
+
+Each backup folder contains `affine.backup` (custom-format DB dump), `storage.tar.gz` (uploads),
+`config.tar.gz` + `env.backup` (config), and `manifest.txt`. The stack must be running.
+Backups go to `~/.affine/backups` by default (override with `BACKUP_ROOT=/path ./backup.sh`) —
+they hold a copy of `.env`, so keep them private and ideally copy them off-machine.
+
+```bash
+./restore.sh <timestamp>     # e.g. ./restore.sh 20260611-140600
+```
+
+Restore stops the stack, **safety-dumps the current DB first** (to `~/.affine/backups/pre-restore-*`),
+recreates the Postgres volume, restores the dump, restores uploads/config (moving the current ones
+aside as `*.before-restore.*`), and brings the stack back up. `env.backup` is **not** auto-applied.
+It prompts before doing anything destructive (`FORCE=1` skips the prompt).
+
+> Tip: take a fresh `./backup.sh` right before any upgrade or risky change.
+
 ## Bumping the MCP version
 
 ```bash
