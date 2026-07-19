@@ -89,6 +89,34 @@ It prompts before doing anything destructive (`FORCE=1` skips the prompt).
 
 > Tip: take a fresh `./backup.sh` right before any upgrade or risky change.
 
+## Migrate to another machine
+
+The normal path is just backup → restore (both auto-detect Docker/Podman):
+
+```bash
+# On the OLD machine (stack running):
+./backup.sh                                  # -> ~/.affine/backups/<ts>/
+
+# Copy the whole ~/.affine/backups/<ts> folder to the NEW machine, then there:
+git clone --recurse-submodules <repo-url> affine && cd affine
+mkdir -p ~/.affine/backups && cp -r /path/to/<ts> ~/.affine/backups/
+cp ~/.affine/backups/<ts>/env.backup .env    # reuse secrets + pairs with the restored private.key
+ENGINE=podman ./restore.sh <ts>              # drop ENGINE= for Docker
+# regenerate the MCP client config (token is already in .env):
+sed -e "s|__MCP_PORT__|$(grep ^MCP_PORT= .env|cut -d= -f2)|g" \
+    -e "s|__AFFINE_MCP_HTTP_TOKEN__|$(grep ^AFFINE_MCP_HTTP_TOKEN= .env|cut -d= -f2)|g" \
+    .mcp.json.example > .mcp.json
+```
+
+The account, workspaces, docs and uploads come across in the dump + blobs; carrying `config`
+(with `private.key`) keeps token/session signing consistent. On rootless Podman, first run
+`loginctl enable-linger "$USER"` so the stack survives logout.
+
+> One-time caveat: if a database was created under Docker (Postgres UID 999 → host 999) it can't
+> be read by rootless Podman. Recover it once with a throwaway **Docker** Postgres over the old
+> data dir (`docker run -e POSTGRES_HOST_AUTH_METHOD=trust -v <pgdata>:/var/lib/postgresql/data
+> pgvector/pgvector:pg16`, then `pg_dump`) before restoring on the Podman machine.
+
 ## Bumping the MCP version
 
 ```bash
