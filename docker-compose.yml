@@ -113,7 +113,18 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
+  nproxy:
+    image: 'docker.io/jc21/nginx-proxy-manager:latest'
+    container_name: nginx_proxy_manager
+    restart: unless-stopped
+    ports:
+      - '80:80'     # Public HTTP Port
+      - '443:443'   # Public HTTPS Port
+      - '81:81'     # Admin WebGUI Port
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
 volumes:
   # Postgres data — managed by the container runtime (see postgres.volumes above).
   affine_pgdata:
+
