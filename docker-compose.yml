@@ -1,8 +1,8 @@
 name: affine
 services:
   affine:
-    # Pinned to the running version (app 0.26.7) by digest for reproducibility.
-    image: ghcr.io/toeverything/affine:0.26.7@sha256:74baac632031260f8c1c8ba34d9734b5addba0b8e72d6d9b9721e39f77738e94
+    # Pinned to the running version (app 0.27.3) by digest for reproducibility.
+    image: ghcr.io/toeverything/affine:0.27.3@sha256:d9d145f9f47b862d1fa96e2a887052b5762846237f75fbb077be990ef646e05c
     container_name: affine_server
     ports:
       - '${PORT:-3010}:3010'
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   affine_migration:
-    image: ghcr.io/toeverything/affine:0.26.7@sha256:74baac632031260f8c1c8ba34d9734b5addba0b8e72d6d9b9721e39f77738e94
+    image: ghcr.io/toeverything/affine:0.27.3@sha256:d9d145f9f47b862d1fa96e2a887052b5762846237f75fbb077be990ef646e05c
     container_name: affine_migration_job
     volumes:
       # custom configurations
